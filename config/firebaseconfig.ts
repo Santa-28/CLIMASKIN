@@ -3,8 +3,9 @@
 
 import { initializeApp } from 'firebase/app';
 import { getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { initializeAuth } from "firebase/auth";
 import { getFirestore } from 'firebase/firestore';
+
 
 // ✅ Firebase Config
 
@@ -21,7 +22,8 @@ const firebaseConfig = {
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-// ✅ Export Firebase Auth instance
-export const auth = getAuth(app);
+// ✅ Initialize Firebase Auth
+export const auth = initializeAuth(app);
+
 // ✅ Export Firestore instance
 export const db = getFirestore(app);
