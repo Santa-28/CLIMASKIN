@@ -21,6 +21,8 @@ import { Product, products } from "../../constants/product";
 import { RecommendationEngine } from "../../services/recommendationEngine";
 import { UserProfile } from "../../types/faceDetection.types";
 import { Alert } from 'react-native';
+import { saveFeedback } from "../../services/feedbackService";
+import { auth } from "../../config/firebaseconfig";
 
 export default function Home() {
   const {
@@ -143,6 +145,38 @@ export default function Home() {
       <Text style={styles.concernText}>{item}</Text>
     </View>
   );
+
+  const handleSubmitFeedback = async () => {
+    if (feedbackRating > 0 || feedbackText.trim().length > 0) {
+      try {
+        const user = auth.currentUser;
+        if (!user) {
+          Alert.alert('Not Logged In', 'You must be logged in to submit feedback.');
+          return;
+        }
+        await saveFeedback(user.uid, feedbackRating, feedbackText.trim());
+        const compliments = [
+          "Thank you for your valuable feedback! 🌟",
+          "We appreciate your input! 💖",
+          "Your feedback helps us improve! 🙌",
+          "Thanks for sharing your thoughts! 😊",
+          "Your opinion matters to us! 👍",
+          "Thanks for helping us grow! 🌱",
+          "We love hearing from you! 💬",
+          "Your feedback is a gift! 🎁",
+        ];
+        const randomCompliment = compliments[Math.floor(Math.random() * compliments.length)];
+        Alert.alert('Feedback Submitted', randomCompliment);
+        // Clear feedback inputs after submission
+        setFeedbackRating(0);
+        setFeedbackText('');
+      } catch (error) {
+        Alert.alert('Submission Error', 'There was an error submitting your feedback. Please try again later.');
+      }
+    } else {
+      Alert.alert('Feedback Incomplete', 'Please provide a rating or some comments.');
+    }
+  };
 
   return (
     <LinearGradient colors={["#4FC3F7", "#81D4FA", "#E3F2FD"]} style={styles.container}>
@@ -357,27 +391,7 @@ export default function Home() {
           />
           <TouchableOpacity
             style={styles.submitButton}
-            onPress={() => {
-              if (feedbackRating > 0 || feedbackText.trim().length > 0) {
-                const compliments = [
-                  "Thank you for your valuable feedback! 🌟",
-                  "We appreciate your input! 💖",
-                  "Your feedback helps us improve! 🙌",
-                  "Thanks for sharing your thoughts! 😊",
-                  "Your opinion matters to us! 👍",
-                  "Thanks for helping us grow! 🌱",
-                  "We love hearing from you! 💬",
-                  "Your feedback is a gift! 🎁",
-                ];
-                const randomCompliment = compliments[Math.floor(Math.random() * compliments.length)];
-                Alert.alert('Feedback Submitted', randomCompliment);
-                // Clear feedback inputs after submission
-                setFeedbackRating(0);
-                setFeedbackText('');
-              } else {
-                Alert.alert('Feedback Incomplete', 'Please provide a rating or some comments.');
-              }
-            }}
+            onPress={handleSubmitFeedback}
           >
             <Text style={styles.submitButtonText}>Submit Feedback</Text>
           </TouchableOpacity>

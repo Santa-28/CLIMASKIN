@@ -37,10 +37,10 @@ const LoginScreen = () => {
     Alert.alert('Info', 'Google login coming soon');
   };
 
-  const handleFacebookLogin = () => {
-    // TODO: Integrate Facebook login logic
-    Alert.alert('Info', 'Facebook login coming soon');
-  };
+  // const handleFacebookLogin = () => {
+  //   // TODO: Integrate Facebook login logic
+  //   Alert.alert('Info', 'Facebook login coming soon');
+  // };
 
   return (
     <LinearGradient
@@ -77,9 +77,9 @@ const LoginScreen = () => {
         <Text style={styles.buttonText}>Login</Text>
       </Pressable>
 
-      <Text style={styles.orText}>Or login with</Text>
+      {/* <Text style={styles.orText}>Or login with</Text> */}
 
-      <Pressable
+      {/* <Pressable
         style={({ pressed }) => [
           styles.socialButton,
           { backgroundColor: pressed ? '#D32F2F' : '#E53935' },
@@ -88,18 +88,9 @@ const LoginScreen = () => {
       >
         <MaterialIcons name="account-circle" size={24} color="#FFF" />
         <Text style={styles.socialButtonText}>Google</Text>
-      </Pressable>
+      </Pressable> */}
 
-      <Pressable
-        style={({ pressed }) => [
-          styles.socialButton,
-          { backgroundColor: pressed ? '#1565C0' : '#1976D2' },
-        ]}
-        onPress={handleFacebookLogin}
-      >
-        <MaterialIcons name="facebook" size={24} color="#FFF" />
-        <Text style={styles.socialButtonText}>Facebook</Text>
-      </Pressable>
+
     </LinearGradient>
   );
 };
