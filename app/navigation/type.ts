@@ -10,3 +10,6 @@ export type AuthStackParamList = {
   Login: undefined;
   Signup: undefined;
 };
+
+// Default export for Expo Router
+export default RootStackParamList;

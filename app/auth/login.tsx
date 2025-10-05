@@ -23,11 +23,8 @@ const LoginScreen = () => {
       if (user) {
         Alert.alert('Success', 'Login successful');
         // Navigate to onboarding or home
-        // router.push('/onboarding/age')
         router.push('/camera/CameraScreen')
-        // router.push('/screens/HomeScreen')
-        // router.push('/dashboard/Home')
-        // router.push('../onboarding/CombinedOnboarding');
+        // router.push('/dashboard/dashboard');
 
       }
     } catch (error: any) {

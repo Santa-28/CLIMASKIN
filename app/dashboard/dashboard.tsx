@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { View, ScrollView, Text, StyleSheet, FlatList, TouchableOpacity } from "react-native";
+import React, { useEffect, useState, useMemo } from "react";
+import { View, ScrollView, Text, StyleSheet, FlatList, TextInput, TouchableOpacity } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialIcons, Ionicons } from "@expo/vector-icons";
 import Animated, {
@@ -13,10 +13,14 @@ import Animated, {
 
 import WeatherCard from "@/components/weather/WeatherCard";
 import ProductCard from "@/components/skinProducts/ProductCard";
+import ProductFilterSelector, { ProductCategory } from "@/components/skinProducts/ProductFilterSelector";
+import ProductReminder from "@/components/notifications/ProductReminder";
+import { ProductCardSkeleton } from "@/components/ui/SkeletonLoader";
 import { useUser } from "../context/UserContext";
 import { Product, products } from "../../constants/product";
 import { RecommendationEngine } from "../../services/recommendationEngine";
 import { UserProfile } from "../../types/faceDetection.types";
+import { Alert } from 'react-native';
 
 export default function Home() {
   const {
@@ -32,7 +36,32 @@ export default function Home() {
   // We will hide age and gender display as per user request, but they are fetched and available in context
 
   const [personalizedRecommendations, setPersonalizedRecommendations] = useState<Product[]>([]);
+  const [isLoadingPersonalized, setIsLoadingPersonalized] = useState(true);
   const [dailyTip, setDailyTip] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<ProductCategory>('All');
+  const [feedbackRating, setFeedbackRating] = useState(0);
+  const [feedbackText, setFeedbackText] = useState('');
+
+  const filteredExploreProducts = useMemo(() => {
+    if (selectedCategory === 'All') {
+      return products;
+    }
+    return products.filter(product => product.type === selectedCategory);
+  }, [selectedCategory]);
+
+  const filteredPersonalized = useMemo(() => {
+    if (selectedCategory === 'All') {
+      return personalizedRecommendations;
+    }
+    return personalizedRecommendations.filter(product => product.type === selectedCategory);
+  }, [personalizedRecommendations, selectedCategory]);
+
+  const featuredProduct = useMemo(() => {
+    if (selectedCategory === 'All') {
+      return products[0];
+    }
+    return filteredExploreProducts[0] || products[0];
+  }, [selectedCategory, filteredExploreProducts]);
 
   // Animations
   const headerOpacity = useSharedValue(0);
@@ -61,11 +90,12 @@ export default function Home() {
       nameOpacity.value = withTiming(1, { duration: 600 });
       nameTranslateY.value = withSpring(0, { damping: 10, stiffness: 100 });
     }
-  }, [userName]);
+  }, [userName, headerOpacity, headerTranslateY, nameOpacity, nameTranslateY]);
 
   useEffect(() => {
     // Generate personalized recommendations
     if (age && gender && skinType) {
+      setIsLoadingPersonalized(true);
       const userProfile: UserProfile = {
         age,
         gender: gender as 'male' | 'female' | 'unknown',
@@ -75,7 +105,11 @@ export default function Home() {
       const recommendedProducts = products.filter(product =>
         recommendations.some(rec => rec.name === product.name)
       );
-      setPersonalizedRecommendations(recommendedProducts);
+      // Simulate loading time
+      setTimeout(() => {
+        setPersonalizedRecommendations(recommendedProducts);
+        setIsLoadingPersonalized(false);
+      }, 2000);
     }
 
     // Generate daily tip based on user data
@@ -94,8 +128,14 @@ export default function Home() {
       entering={FadeInUp.duration(800).delay(200).springify().damping(12).stiffness(90)}
       style={styles.productCard}
     >
-      <ProductCard product={item} />
+      <ProductCard product={item} selectedCategory={selectedCategory} />
     </Animated.View>
+  );
+
+  const renderSkeletonCard = () => (
+    <View style={styles.productCard}>
+      <ProductCardSkeleton />
+    </View>
   );
 
   const renderConcernChip = ({ item }: { item: string }) => (
@@ -112,13 +152,14 @@ export default function Home() {
           <MaterialIcons name="wb-sunny" size={42} color="#FFB300" style={styles.headerIcon} />
 
           <View style={styles.greetingContainer}>
-            <Text style={styles.title}>Welcome</Text>
+            {/* <Text style={styles.title}>Climaskin</Text> */}
             {userName ? (
               <Animated.Text style={[styles.title, animatedNameStyle]}>
-                {" "}
-                {userName} 🌤️
+                Welcome {userName} 🌤️
               </Animated.Text>
-            ) : null}
+            ) : (
+              <Text style={styles.title}>Welcome</Text>
+            )}
           </View>
 
           <Text style={styles.subtitle}>Your personalized skin care starts here</Text>
@@ -195,22 +236,64 @@ export default function Home() {
           <WeatherCard />
         </Animated.View>
 
+        {/* PRODUCT FILTER */}
+        <Animated.View
+          entering={FadeInUp.duration(1000).delay(500).springify().damping(10).stiffness(80)}
+        >
+          <ProductFilterSelector
+            selectedCategory={selectedCategory}
+            onCategorySelect={setSelectedCategory}
+          />
+        </Animated.View>
+
+        {/* REMINDER NOTIFICATIONS */}
+        <Animated.View
+          entering={FadeInUp.duration(1000).delay(600).springify().damping(10).stiffness(80)}
+        >
+          <ProductReminder />
+        </Animated.View>
+
         {/* PERSONALIZED RECOMMENDATIONS */}
-        {personalizedRecommendations.length > 0 && (
+        {isLoadingPersonalized ? (
           <Animated.View
-            entering={FadeInUp.duration(1000).delay(600).springify().damping(10).stiffness(80)}
+            entering={FadeInUp.duration(1000).delay(700).springify().damping(10).stiffness(80)}
             style={styles.recommendationContainer}
           >
             <Text style={styles.sectionTitle}>Personalized for You</Text>
             <FlatList
-              data={personalizedRecommendations}
-              renderItem={renderProductCard}
+              data={[1, 2, 3, 4]}
+              renderItem={renderSkeletonCard}
               horizontal
               showsHorizontalScrollIndicator={false}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item) => item.toString()}
               contentContainerStyle={styles.recommendationList}
             />
           </Animated.View>
+        ) : (
+          filteredPersonalized.length > 0 ? (
+            <Animated.View
+              entering={FadeInUp.duration(1000).delay(700).springify().damping(10).stiffness(80)}
+              style={styles.recommendationContainer}
+            >
+              <Text style={styles.sectionTitle}>Personalized for You</Text>
+              <FlatList
+                data={filteredPersonalized}
+                renderItem={renderProductCard}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.recommendationList}
+              />
+            </Animated.View>
+          ) : (
+            <Animated.View
+              entering={FadeInUp.duration(1000).delay(700).springify().damping(10).stiffness(80)}
+              style={styles.recommendationContainer}
+            >
+              <Text style={styles.sectionTitle}>Personalized for You</Text>
+              <Text style={styles.noRecommendationsText}>No personalized recommendations available at the moment.</Text>
+            </Animated.View>
+          )
         )}
 
         {/* FEATURED PRODUCT */}
@@ -219,7 +302,7 @@ export default function Home() {
           style={styles.cardContainer}
         >
           <Text style={styles.sectionTitle}>Featured Product</Text>
-          <ProductCard product={products[0]} />
+          <ProductCard product={featuredProduct} />
         </Animated.View>
 
         {/* ALL RECOMMENDATIONS */}
@@ -227,15 +310,77 @@ export default function Home() {
           entering={FadeInUp.duration(1000).delay(1000).springify().damping(10).stiffness(80)}
           style={styles.recommendationContainer}
         >
-          <Text style={styles.sectionTitle}>Explore More</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Explore More</Text>
+            <Text style={styles.productCount}>
+              {filteredExploreProducts.length} product{filteredExploreProducts.length !== 1 ? 's' : ''}
+            </Text>
+          </View>
           <FlatList
-            data={products}
+            data={filteredExploreProducts}
             renderItem={renderProductCard}
             horizontal
             showsHorizontalScrollIndicator={false}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.recommendationList}
           />
+        </Animated.View>
+
+        {/* FEEDBACK SECTION */}
+        <Animated.View
+          entering={FadeInUp.duration(1000).delay(1100).springify().damping(10).stiffness(80)}
+          style={styles.feedbackContainer}
+        >
+          <Text style={styles.sectionTitle}>Share Your Feedback</Text>
+          <View style={styles.ratingContainer}>
+            <Text style={styles.ratingLabel}>Rate your experience:</Text>
+            <View style={styles.starsContainer}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity key={star} onPress={() => setFeedbackRating(star)}>
+                  <MaterialIcons
+                    name={star <= feedbackRating ? 'star' : 'star-border'}
+                    size={32}
+                    color={star <= feedbackRating ? '#FFD700' : '#CCCCCC'}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+          <TextInput
+            style={styles.feedbackInput}
+            placeholder="Tell us what you think..."
+            placeholderTextColor="#666666"
+            value={feedbackText}
+            onChangeText={setFeedbackText}
+            multiline
+            numberOfLines={4}
+          />
+          <TouchableOpacity
+            style={styles.submitButton}
+            onPress={() => {
+              if (feedbackRating > 0 || feedbackText.trim().length > 0) {
+                const compliments = [
+                  "Thank you for your valuable feedback! 🌟",
+                  "We appreciate your input! 💖",
+                  "Your feedback helps us improve! 🙌",
+                  "Thanks for sharing your thoughts! 😊",
+                  "Your opinion matters to us! 👍",
+                  "Thanks for helping us grow! 🌱",
+                  "We love hearing from you! 💬",
+                  "Your feedback is a gift! 🎁",
+                ];
+                const randomCompliment = compliments[Math.floor(Math.random() * compliments.length)];
+                Alert.alert('Feedback Submitted', randomCompliment);
+                // Clear feedback inputs after submission
+                setFeedbackRating(0);
+                setFeedbackText('');
+              } else {
+                Alert.alert('Feedback Incomplete', 'Please provide a rating or some comments.');
+              }
+            }}
+          >
+            <Text style={styles.submitButtonText}>Submit Feedback</Text>
+          </TouchableOpacity>
         </Animated.View>
       </ScrollView>
     </LinearGradient>
@@ -387,5 +532,66 @@ const styles = StyleSheet.create({
   },
   productCard: {
     marginRight: 16,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  productCount: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: '#666666',
+  },
+  noRecommendationsText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    color: '#666666',
+    textAlign: 'center',
+    marginTop: 12,
+  },
+  feedbackContainer: {
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+  },
+  ratingContainer: {
+    marginBottom: 16,
+  },
+  ratingLabel: {
+    fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    color: "#000000",
+    marginBottom: 8,
+  },
+  starsContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+  },
+  feedbackInput: {
+    backgroundColor: "rgba(255, 255, 255, 0.8)",
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    fontFamily: "Poppins-Regular",
+    color: "#000000",
+    marginBottom: 16,
+    textAlignVertical: "top",
+  },
+  submitButton: {
+    backgroundColor: "#4FC3F7",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    alignItems: "center",
+  },
+  submitButtonText: {
+    fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    color: "#FFFFFF",
   },
 });

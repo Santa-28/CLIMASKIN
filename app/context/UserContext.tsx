@@ -1,4 +1,3 @@
-
 // app/context/UserContext.tsx
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
@@ -6,7 +5,7 @@ interface UserContextType {
   userName: string;
   setUserName: (name: string) => void;
   age: number | null;
-  setAge: (age: number) => void;
+  setAge: (age: number | null) => void;
   gender: string | null;
   setGender: (gender: string) => void;
   skinType: string;
@@ -17,6 +16,7 @@ interface UserContextType {
   setSkinConcerns: (concerns: string[]) => void;
   routinePreferences: string;
   setRoutinePreferences: (pref: string) => void;
+
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -52,3 +52,6 @@ export const useUser = () => {
   }
   return context;
 };
+
+// Default export for Expo Router
+export default UserProvider;

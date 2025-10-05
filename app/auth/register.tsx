@@ -27,7 +27,7 @@ const RegisterScreen = () => {
       const user = await registerUser(email, password);
       if (user) {
         Alert.alert('Success', 'Registration successful!');
-        router.push('/onboarding/age');
+        router.push('/auth/login');
       }
     } catch (error: any) {
       Alert.alert('Registration Failed', error.message);

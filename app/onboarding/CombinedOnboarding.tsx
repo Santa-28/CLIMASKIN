@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert, Image, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
@@ -9,6 +9,20 @@ import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
 import { useUser } from '../context/UserContext';
 import { getAuth } from 'firebase/auth';
 import { saveQuizAnswers } from '../../services/quizService';
+import * as ImagePicker from 'expo-image-picker';
+import axios from 'axios';
+import { db } from '@/config/firebaseconfig';
+import { doc, setDoc } from 'firebase/firestore';
+
+// Define the response structure from Roboflow
+interface PredictionResponse {
+  predictions: {
+    [key: string]: {
+      class_id: number;
+      confidence: number;
+    };
+  };
+}
 
 const quizData = [
   {
@@ -27,12 +41,17 @@ export default function CombinedOnboarding() {
   const [currentStep, setCurrentStep] = useState(0);
   const [profileData, setProfileData] = useState({
     name: '',
-    skinType: 'normal',
+    skinType: 'unknown',
     waterIntake: 2,
+    imageUri: '',
   });
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
+  const [skinConcerns, setSkinConcerns] = useState<string[]>([]);
+  const [routinePreferences, setRoutinePreferences] = useState('Natural');
+  const [loading, setLoading] = useState(false);
+  const [prediction, setPrediction] = useState<string | null>(null);
   const router = useRouter();
-  const { setUserName, setSkinType, setWaterIntake } = useUser();
+  const { setUserName, setSkinType, setWaterIntake, setSkinConcerns: setContextSkinConcerns, setRoutinePreferences: setContextRoutinePreferences } = useUser();
 
   const handleProfileChange = (key: string, value: any) => {
     setProfileData(prev => ({ ...prev, [key]: value }));
@@ -42,12 +61,95 @@ export default function CombinedOnboarding() {
     setQuizAnswers(prev => ({ ...prev, [key]: value }));
   };
 
+  const toggleConcern = (concern: string) => {
+    setSkinConcerns((prev) =>
+      prev.includes(concern) ? prev.filter((c) => c !== concern) : [...prev, concern]
+    );
+  };
+
   const validateProfile = () => {
     if (!profileData.name.trim()) {
       Alert.alert('Error', 'Please enter your name');
       return false;
     }
+    if (profileData.skinType === 'unknown' && !prediction) {
+      Alert.alert('Error', 'Please upload a skin image to detect your skin type');
+      return false;
+    }
     return true;
+  };
+
+  const validateAllQuestions = () => {
+    // Check if all quiz questions are answered
+    for (const q of quizData) {
+      if (!quizAnswers[q.key]) {
+        Alert.alert('Error', `Please answer: ${q.question}`);
+        return false;
+      }
+    }
+    // Check if at least one skin concern is selected
+    if (skinConcerns.length === 0) {
+      Alert.alert('Error', 'Please select at least one skin concern');
+      return false;
+    }
+    return true;
+  };
+
+  const pickImage = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      Alert.alert('Permission required', 'Permission to access media library is required!');
+      return;
+    }
+    const pickerResult = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+      base64: true,
+    });
+    if (!pickerResult.canceled && pickerResult.assets[0].base64) {
+      handleProfileChange('imageUri', pickerResult.assets[0].uri);
+      classifySkinType(pickerResult.assets[0].base64);
+    }
+  };
+
+  const classifySkinType = async (base64Image: string) => {
+    try {
+      setLoading(true);
+      setPrediction(null);
+
+      const response = await axios.post(
+        "https://serverless.roboflow.com/skin-type-tgow5/1",
+        base64Image,
+        {
+          params: { api_key: "JFfjlaDDlbFKWcAGYBy3" },
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        }
+      );
+
+      console.log("Full Response:", response.data);
+
+      const data = response.data as PredictionResponse;
+      const predictions = data.predictions;
+      let bestClass = "";
+      let bestConfidence = 0;
+
+      for (const [label, info] of Object.entries(predictions)) {
+        const confidence = info.confidence;
+        if (confidence > bestConfidence) {
+          bestClass = label;
+          bestConfidence = confidence;
+        }
+      }
+
+      const predictedSkinType = `${bestClass} (${(bestConfidence * 100).toFixed(2)}%)`;
+      setPrediction(predictedSkinType);
+      handleProfileChange('skinType', bestClass.toLowerCase());
+    } catch (error: any) {
+      console.error("Error:", error.message);
+      Alert.alert("Something went wrong!", "Try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleNext = () => {
@@ -55,10 +157,6 @@ export default function CombinedOnboarding() {
       if (validateProfile()) {
         setCurrentStep(1);
       }
-    } else if (currentStep < quizData.length) {
-      setCurrentStep(currentStep + 1);
-    } else {
-      handleFinish();
     }
   };
 
@@ -69,6 +167,10 @@ export default function CombinedOnboarding() {
   };
 
   const handleFinish = async () => {
+    if (!validateAllQuestions()) {
+      return;
+    }
+
     try {
       const auth = getAuth();
       const user = auth.currentUser;
@@ -81,6 +183,8 @@ export default function CombinedOnboarding() {
       setUserName(profileData.name);
       setSkinType(profileData.skinType);
       setWaterIntake(profileData.waterIntake);
+      setContextSkinConcerns(skinConcerns);
+      setContextRoutinePreferences(routinePreferences);
 
       // Save quiz answers
       await saveQuizAnswers(user.uid, {
@@ -89,8 +193,23 @@ export default function CombinedOnboarding() {
         ...quizAnswers,
       });
 
+      // Save to Firestore
+      await setDoc(
+        doc(db, 'users', user.uid),
+        {
+          userName: profileData.name,
+          skinType: profileData.skinType,
+          waterIntake: profileData.waterIntake,
+          skinConcerns,
+          routinePreferences,
+          quizAnswers,
+        },
+        { merge: true }
+      );
+
       console.log('Onboarding completed');
-      router.push('/onboarding/SkinCareQuestions');
+      router.push('/dashboard/dashboard');
+      // router.push('/dashboard/Home');
     } catch (error: any) {
       console.error('Failed to save onboarding data:', error.message);
       Alert.alert('Error', 'Failed to save your data. Please try again.');
@@ -135,9 +254,27 @@ export default function CombinedOnboarding() {
             <Picker.Item label="Dry" value="dry" />
             <Picker.Item label="Combination" value="combination" />
             <Picker.Item label="Sensitive" value="sensitive" />
+            <Picker.Item label="Unknown" value="unknown" />
           </Picker>
         </View>
       </View>
+
+      {/* Image Upload - Show only if skinType is 'unknown' */}
+      {profileData.skinType === 'unknown' && (
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Upload Skin Image to Detect Type</Text>
+          <TouchableOpacity style={styles.imageUploadButton} onPress={pickImage} disabled={loading}>
+            <Text style={styles.imageUploadButtonText}>{loading ? 'Analyzing...' : 'Choose Image'}</Text>
+          </TouchableOpacity>
+          {loading && <ActivityIndicator size="large" color="#4CAF50" style={styles.loadingIndicator} />}
+          {profileData.imageUri ? (
+            <Image source={{ uri: profileData.imageUri }} style={styles.uploadedImage} />
+          ) : null}
+          {prediction && (
+            <Text style={styles.predictionText}>Predicted Skin Type: {prediction}</Text>
+          )}
+        </View>
+      )}
 
       {/* Water Intake */}
       <View style={styles.inputContainer}>
@@ -161,52 +298,106 @@ export default function CombinedOnboarding() {
     </Animated.View>
   );
 
-  const renderQuizStep = () => {
-    const questionIndex = currentStep - 1;
-    const q = quizData[questionIndex];
+  const renderAllQuestionsStep = () => {
+    const concernsOptions = ['Acne', 'Dryness', 'Oiliness', 'Aging', 'Sensitivity'];
 
     return (
       <Animated.View entering={FadeInDown.duration(600)} style={styles.stepContainer}>
-        <MaterialIcons name="wb-sunny" size={60} color="#FFB300" style={styles.icon} />
-        <Text style={styles.heading}>{q.question}</Text>
-        <Text style={styles.subheading}>
-          Question {questionIndex + 1} of {quizData.length}
-        </Text>
+        <View style={styles.header}>
+          <MaterialIcons name="wb-sunny" size={40} color="#FFB300" />
+          <Text style={styles.title}>Complete Your Profile</Text>
+          <Text style={styles.subtitle}>Answer these questions to personalize your experience</Text>
+        </View>
 
-        <View style={styles.optionsContainer}>
-          {q.options.map((option, index) => (
-            <Animated.View
-              key={option}
-              entering={FadeInUp.duration(400).delay(index * 100)}
-            >
+        {/* Quiz Questions */}
+        {quizData.map((q, index) => (
+          <Animated.View
+            key={q.key}
+            entering={FadeInUp.duration(400).delay(index * 100)}
+            style={styles.questionSection}
+          >
+            <Text style={styles.questionText}>{q.question}</Text>
+            <View style={styles.optionsContainer}>
+              {q.options.map((option) => (
+                <TouchableOpacity
+                  key={option}
+                  onPress={() => handleQuizAnswer(q.key, option)}
+                  style={[
+                    styles.option,
+                    quizAnswers[q.key] === option && styles.selectedOption,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.optionText,
+                      quizAnswers[q.key] === option && styles.selectedOptionText,
+                    ]}
+                  >
+                    {option}
+                  </Text>
+                  {quizAnswers[q.key] === option && (
+                    <MaterialIcons name="check-circle" size={24} color="#4CAF50" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </Animated.View>
+        ))}
+
+        {/* Skin Concerns */}
+        <Animated.View
+          entering={FadeInUp.duration(400).delay(200)}
+          style={styles.questionSection}
+        >
+          <Text style={styles.questionText}>Skin Concerns (select all that apply)</Text>
+          <View style={styles.concernsWrapper}>
+            {concernsOptions.map((concern) => (
               <TouchableOpacity
-                onPress={() => handleQuizAnswer(q.key, option)}
+                key={concern}
                 style={[
-                  styles.option,
-                  quizAnswers[q.key] === option && styles.selectedOption,
+                  styles.concernButton,
+                  skinConcerns.includes(concern) && styles.selectedConcernButton,
                 ]}
+                onPress={() => toggleConcern(concern)}
               >
                 <Text
                   style={[
-                    styles.optionText,
-                    quizAnswers[q.key] === option && styles.selectedOptionText,
+                    styles.concernButtonText,
+                    skinConcerns.includes(concern) && styles.selectedConcernButtonText,
                   ]}
                 >
-                  {option}
+                  {concern}
                 </Text>
-                {quizAnswers[q.key] === option && (
-                  <MaterialIcons name="check-circle" size={24} color="#4CAF50" />
-                )}
               </TouchableOpacity>
-            </Animated.View>
-          ))}
-        </View>
+            ))}
+          </View>
+        </Animated.View>
+
+        {/* Routine Preferences */}
+        <Animated.View
+          entering={FadeInUp.duration(400).delay(300)}
+          style={styles.questionSection}
+        >
+          <Text style={styles.questionText}>Routine Preferences</Text>
+          <View style={styles.pickerWrapper}>
+            <MaterialIcons name="settings" size={24} color="#4CAF50" style={styles.inputIcon} />
+            <Picker
+              selectedValue={routinePreferences}
+              onValueChange={setRoutinePreferences}
+              style={styles.picker}
+            >
+              <Picker.Item label="Natural" value="Natural" />
+              <Picker.Item label="Medical" value="Medical" />
+              <Picker.Item label="Cosmetic" value="Cosmetic" />
+            </Picker>
+          </View>
+        </Animated.View>
       </Animated.View>
     );
   };
 
   const renderProgressBar = () => {
-    const totalSteps = 1 + quizData.length;
+    const totalSteps = 2; // Only 2 steps now
     return (
       <View style={styles.progressContainer}>
         {Array.from({ length: totalSteps }, (_, index) => (
@@ -227,7 +418,7 @@ export default function CombinedOnboarding() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {renderProgressBar()}
 
-        {currentStep === 0 ? renderProfileStep() : renderQuizStep()}
+        {currentStep === 0 ? renderProfileStep() : renderAllQuestionsStep()}
 
         <Animated.View entering={FadeInUp.duration(400).delay(600)} style={styles.buttonContainer}>
           {currentStep > 0 && (
@@ -237,12 +428,12 @@ export default function CombinedOnboarding() {
           )}
 
           <TouchableOpacity
-            onPress={handleNext}
+            onPress={currentStep === 0 ? handleNext : handleFinish}
             style={styles.nextButton}
           >
             <LinearGradient colors={['#4CAF50', '#81C784']} style={styles.gradientButton}>
               <Text style={styles.buttonText}>
-                {currentStep === 0 ? 'Next' : currentStep === quizData.length ? 'Finish' : 'Next'}
+                {currentStep === 0 ? 'Next' : 'Finish'}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -258,7 +449,7 @@ const styles = StyleSheet.create({
   stepContainer: { alignItems: 'center', marginBottom: 20 },
   header: { alignItems: 'center', marginBottom: 20 },
   title: { fontSize: 28, fontFamily: 'Poppins-Bold', color: '#333', textShadowColor: 'rgba(0, 0, 0, 0.2)', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 4 },
-  subtitle: { fontSize: 16, fontFamily: 'Poppins-Regular', color: '#666', marginTop: 8 },
+  subtitle: { fontSize: 16, fontFamily: 'Poppins-Regular', color: '#666', marginTop: 8, textAlign: 'center' },
   inputContainer: { marginBottom: 20, width: '100%' },
   label: { fontSize: 16, fontFamily: 'Poppins-SemiBold', color: '#333', marginBottom: 8 },
   inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F5F5', borderRadius: 12, paddingHorizontal: 12 },
@@ -269,14 +460,18 @@ const styles = StyleSheet.create({
   sliderWrapper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   slider: { flex: 1, height: 40 },
   sliderValue: { fontSize: 14, fontFamily: 'Poppins-Regular', color: '#333', textAlign: 'center', marginTop: 8 },
-  icon: { alignSelf: 'center', marginBottom: 16 },
-  heading: { fontSize: 28, fontFamily: 'Poppins-Bold', color: '#FFFFFF', textAlign: 'center', marginBottom: 8, textShadowColor: 'rgba(0, 0, 0, 0.2)', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 4 },
-  subheading: { fontSize: 16, fontFamily: 'Poppins-Regular', color: '#E3F2FD', textAlign: 'center', marginBottom: 24 },
-  optionsContainer: { width: '100%', alignItems: 'center', marginBottom: 24 },
+  questionSection: { width: '100%', marginBottom: 24, backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 16, padding: 16 },
+  questionText: { fontSize: 18, fontFamily: 'Poppins-SemiBold', color: '#333', marginBottom: 12 },
+  optionsContainer: { width: '100%', alignItems: 'center' },
   option: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: 16, borderRadius: 15, backgroundColor: '#FFFFFF', marginVertical: 8, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 },
   selectedOption: { borderWidth: 2, borderColor: '#4CAF50', backgroundColor: '#E8F5E9' },
-  optionText: { fontSize: 18, fontFamily: 'Poppins-SemiBold', color: '#333' },
+  optionText: { fontSize: 16, fontFamily: 'Poppins-SemiBold', color: '#333' },
   selectedOptionText: { color: '#4CAF50' },
+  concernsWrapper: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  concernButton: { backgroundColor: '#F5F5F5', borderRadius: 12, padding: 12, marginVertical: 5, width: '48%', alignItems: 'center', borderWidth: 2, borderColor: 'transparent' },
+  selectedConcernButton: { backgroundColor: '#E8F5E9', borderColor: '#4CAF50' },
+  concernButtonText: { fontSize: 14, fontFamily: 'Poppins-Regular', color: '#333' },
+  selectedConcernButtonText: { color: '#4CAF50', fontFamily: 'Poppins-SemiBold' },
   progressContainer: { flexDirection: 'row', justifyContent: 'center', marginBottom: 24 },
   progressDot: { width: 10, height: 10, borderRadius: 5, marginHorizontal: 4 },
   activeDot: { backgroundColor: '#4CAF50' },
@@ -287,4 +482,9 @@ const styles = StyleSheet.create({
   gradientButton: { paddingVertical: 14, alignItems: 'center' },
   buttonText: { fontSize: 18, fontFamily: 'Poppins-SemiBold', color: '#FFFFFF' },
   navButtonText: { fontSize: 16, fontFamily: 'Poppins-SemiBold', color: '#4CAF50' },
+  imageUploadButton: { backgroundColor: '#4CAF50', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, alignItems: 'center' },
+  imageUploadButtonText: { fontSize: 16, fontFamily: 'Poppins-SemiBold', color: '#FFFFFF' },
+  uploadedImage: { width: 100, height: 100, borderRadius: 12, marginTop: 8, alignSelf: 'center' },
+  loadingIndicator: { marginTop: 10 },
+  predictionText: { marginTop: 10, fontSize: 16, fontFamily: 'Poppins-SemiBold', color: '#4CAF50', textAlign: 'center' },
 });

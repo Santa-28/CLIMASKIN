@@ -4,6 +4,9 @@ import { View, Text, StyleSheet, Button, ActivityIndicator, Alert, Dimensions, M
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { router } from "expo-router";
 import { useUser } from "../context/UserContext";
+import { getAuth } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '@/config/firebaseconfig';
 
 const API_KEY = "2LJbWFec6fWIyd0vl2AJ2HGPb6LNK3YM";
 const API_SECRET = "sKMm97ris1tdCnWfl2--XvdLiJnge9fm";
@@ -48,6 +51,21 @@ export default function CameraScreen() {
         setFaces(data.faces.map((f: any) => f.face_rectangle));
         setAge(detected.age);
         setGender(detected.gender);
+
+        // Optionally save to Firestore
+        const auth = getAuth();
+        const user = auth.currentUser;
+        if (user) {
+          try {
+            await setDoc(doc(db, 'users', user.uid), {
+              age: detected.age,
+              gender: detected.gender,
+            }, { merge: true });
+          } catch (error) {
+            console.error('Error saving to Firestore:', error);
+          }
+        }
+
         setModalVisible(true);
       } else {
         Alert.alert("No Face Detected", "Please try again!");
