@@ -208,8 +208,8 @@ export default function CombinedOnboarding() {
       );
 
       console.log('Onboarding completed');
-      router.push('/dashboard/dashboard');
-      // router.push('/dashboard/Home');
+      // router.push('/dashboard/dashboard');
+      router.push('/dashboard/Home');
     } catch (error: any) {
       console.error('Failed to save onboarding data:', error.message);
       Alert.alert('Error', 'Failed to save your data. Please try again.');

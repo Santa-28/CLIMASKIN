@@ -7,7 +7,7 @@
       "icon": "./assets/images/adaptiveic.png",
       "scheme": "climaskin",
       "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
       "sdkVersion": "54.0.0",
     "ios": {
       "supportsTablet": true
@@ -35,7 +35,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/Favisplash.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"

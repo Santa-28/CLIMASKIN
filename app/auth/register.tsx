@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Text, StyleSheet, Pressable, Alert } from 'react-native';
+import { Text, StyleSheet, Pressable, Alert, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons, FontAwesome } from '@expo/vector-icons';
 import { InputField } from '../../components/ui/InputField';
@@ -34,21 +34,24 @@ const RegisterScreen = () => {
     }
   };
 
-  const handleGoogleRegister = () => {
-    // TODO: Implement Google sign-up
-    Alert.alert('Info', 'Google sign-up coming soon!');
-  };
+  // const handleGoogleRegister = () => {
+  //   // TODO: Implement Google sign-up
+  //   Alert.alert('Info', 'Google sign-up coming soon!');
+  // };
 
-  const handleFacebookRegister = () => {
-    // TODO: Implement Facebook sign-up
-    Alert.alert('Info', 'Facebook sign-up coming soon!');
-  };
+  // const handleFacebookRegister = () => {
+  //   // TODO: Implement Facebook sign-up
+  //   Alert.alert('Info', 'Facebook sign-up coming soon!');
+  // };
 
   return (
     <LinearGradient
       colors={['#4FC3F7', '#81D4FA', '#E3F2FD']}
       style={styles.container}
     >
+      <View style={styles.iconContainer}>
+        <MaterialIcons name="wb-sunny" size={80} color="#FFB300"  />
+      </View>
       <Text style={styles.heading}>Join ClimaSkin!</Text>
       <Text style={styles.subheading}>Create your account</Text>
 
@@ -86,7 +89,7 @@ const RegisterScreen = () => {
       >
         <Text style={styles.buttonText}>Register</Text>
       </Pressable>
-
+{/* 
       <Text style={styles.orText}>Or register with</Text>
 
       <Pressable
@@ -109,7 +112,7 @@ const RegisterScreen = () => {
       >
         <MaterialIcons name="facebook" size={24} color="#FFF" />
         <Text style={styles.socialButtonText}>Facebook</Text>
-      </Pressable>
+      </Pressable> */}
     </LinearGradient>
   );
 };
@@ -177,5 +180,9 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-SemiBold',
     color: '#FFFFFF',
     marginLeft: 8,
+  },
+  iconContainer: {
+    alignItems: 'center',
+    marginBottom: 12,
   },
 });

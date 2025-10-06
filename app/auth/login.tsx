@@ -1,40 +1,39 @@
-import React, { useState } from 'react';
-import { Text, StyleSheet, Pressable, Alert } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialIcons } from '@expo/vector-icons';
-import { InputField } from '../../components/ui/InputField';
-import { loginUser } from '../../services/auth';
-import { useRouter } from 'expo-router';
-
+import React, { useState } from "react";
+import { Text, StyleSheet, Pressable, Alert, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { MaterialIcons } from "@expo/vector-icons";
+import { InputField } from "../../components/ui/InputField";
+import { loginUser } from "../../services/auth";
+import { useRouter } from "expo-router";
 
 const LoginScreen = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const router = useRouter();
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please enter email and password');
+      Alert.alert("Error", "Please enter email and password");
       return;
     }
 
     try {
       const user = await loginUser(email, password);
       if (user) {
-        Alert.alert('Success', 'Login successful');
+        Alert.alert("Success", "Login successful");
         // Navigate to onboarding or home
-        router.push('/camera/CameraScreen')
+        router.push("/camera/CameraScreen");
         // router.push('/dashboard/dashboard');
-
+        // router.push('../dashboard/Home');
       }
     } catch (error: any) {
-      Alert.alert('Login Failed', error.message);
+      Alert.alert("Login Failed", error.message);
     }
   };
 
   const handleGoogleLogin = () => {
     // TODO: Integrate Google login logic
-    Alert.alert('Info', 'Google login coming soon');
+    Alert.alert("Info", "Google login coming soon");
   };
 
   // const handleFacebookLogin = () => {
@@ -44,9 +43,12 @@ const LoginScreen = () => {
 
   return (
     <LinearGradient
-      colors={['#4FC3F7', '#81D4FA', '#E3F2FD']}
+      colors={["#4FC3F7", "#81D4FA", "#E3F2FD"]}
       style={styles.container}
     >
+      <View style={styles.iconContainer}>
+        <MaterialIcons name="wb-sunny" size={80} color="#FFB300" />
+      </View>
       <Text style={styles.heading}>Welcome Back!</Text>
       <Text style={styles.subheading}>Login to ClimaSkin</Text>
 
@@ -70,7 +72,7 @@ const LoginScreen = () => {
       <Pressable
         style={({ pressed }) => [
           styles.button,
-          { backgroundColor: pressed ? '#43A047' : '#4CAF50' },
+          { backgroundColor: pressed ? "#43A047" : "#4CAF50" },
         ]}
         onPress={handleLogin}
       >
@@ -89,8 +91,6 @@ const LoginScreen = () => {
         <MaterialIcons name="account-circle" size={24} color="#FFF" />
         <Text style={styles.socialButtonText}>Google</Text>
       </Pressable> */}
-
-
     </LinearGradient>
   );
 };
@@ -101,62 +101,66 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   heading: {
     fontSize: 28,
-    fontFamily: 'Poppins-Bold',
-    color: '#FFFFFF',
-    textAlign: 'center',
+    fontFamily: "Poppins-Bold",
+    color: "#FFFFFF",
+    textAlign: "center",
     marginBottom: 8,
   },
   subheading: {
     fontSize: 16,
-    fontFamily: 'Poppins-Regular',
-    color: '#E3F2FD',
-    textAlign: 'center',
+    fontFamily: "Poppins-Regular",
+    color: "#E3F2FD",
+    textAlign: "center",
     marginBottom: 24,
   },
   button: {
     paddingVertical: 12,
     borderRadius: 25,
     marginVertical: 12,
-    alignItems: 'center',
+    alignItems: "center",
     elevation: 5,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
   },
   buttonText: {
     fontSize: 18,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#FFFFFF',
+    fontFamily: "Poppins-SemiBold",
+    color: "#FFFFFF",
   },
   orText: {
     fontSize: 14,
-    fontFamily: 'Poppins-Regular',
-    color: '#FFFFFF',
-    textAlign: 'center',
+    fontFamily: "Poppins-Regular",
+    color: "#FFFFFF",
+    textAlign: "center",
     marginVertical: 12,
   },
   socialButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 12,
     borderRadius: 25,
     marginVertical: 8,
-    justifyContent: 'center',
+    justifyContent: "center",
     elevation: 5,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
   },
   socialButtonText: {
     fontSize: 16,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#FFFFFF',
+    fontFamily: "Poppins-SemiBold",
+    color: "#FFFFFF",
     marginLeft: 8,
+  },
+  iconContainer: {
+    alignItems: "center",
+    marginBottom: 12,
   },
 });
